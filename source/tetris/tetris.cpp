@@ -14,5 +14,7 @@ void Tetris::initialize(){
 }
 
 void Tetris::gameLoop(){
-
+    while (true){
+        swiWaitForVBlank();
+    }
 }

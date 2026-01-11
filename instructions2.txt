@@ -1,0 +1,223 @@
+================================================================================
+                    FINISHING YOUR RENDERER - CONCRETE STEPS
+================================================================================
+
+Your current renderer.cpp ends at line 34 with m_screen = SCREEN;
+You now need to add three things right after that line.
+
+================================================================================
+STEP 1: CREATE TILES
+================================================================================
+
+Your m_tilePtr points to where tile graphics are stored.
+You have 14 colors in Constants::TILE_COLORS.
+You need to create 14 tiles (plus tile 0 for empty).
+
+WHAT TO DO:
+
+First, cast m_tilePtr to a u8* so you can write individual bytes:
+
+    u8* tileMemory = (u8*)m_tilePtr;
+
+Now you need to fill tiles. Each tile is 64 bytes.
+
+Tile 0 (empty): starts at byte 0, fill with 0
+Tile 1 (salmon): starts at byte 64, fill with 1
+Tile 2 (orange): starts at byte 128, fill with 2
+... and so on
+
+Use memset to fill each tile. memset takes: (destination, value, size)
+
+For tile 0 (empty):
+    memset(&tileMemory[0], 0, 64);
+
+For tile 1 (salmon color, palette index 1):
+    memset(&tileMemory[64], 1, 64);
+
+For tile 2 (orange color, palette index 2):
+    memset(&tileMemory[128], 2, 64);
+
+See the pattern? Tile N starts at byte N*64, fill with value N.
+
+You can use a loop:
+
+    for(int i = 0; i < 15; i++){
+        memset(&tileMemory[i * 64], i, 64);
+    }
+
+This creates 15 tiles (0-14), each filled with its own index.
+
+ADD TO RENDERER.CPP (after m_screen = SCREEN;):
+
+    //create tiles
+    u8* tileMemory = (u8*)m_tilePtr;
+    for(int i = 0; i < 15; i++){
+        memset(&tileMemory[i * 64], i, 64);
+    }
+
+================================================================================
+STEP 2: SET UP PALETTE
+================================================================================
+
+Now you need to tell the NDS what colors those palette indices mean.
+
+You have two palette arrays:
+    BG_PALETTE       (for main screen)
+    BG_PALETTE_SUB   (for sub screen)
+
+Your colors are in Constants::TILE_COLORS (14 colors).
+
+You need to check m_screen to know which palette to use.
+
+WHAT TO DO:
+
+First set palette index 0 to black (empty/background):
+
+    if(m_screen == Constants::MAIN_SCREEN){
+        BG_PALETTE[0] = RGB15(0, 0, 0);
+    } else {
+        BG_PALETTE_SUB[0] = RGB15(0, 0, 0);
+    }
+
+Then copy your 14 colors to palette indices 1-14:
+
+    if(m_screen == Constants::MAIN_SCREEN){
+        for(int i = 0; i < 14; i++){
+            BG_PALETTE[i + 1] = Constants::TILE_COLORS[i];
+        }
+    } else {
+        for(int i = 0; i < 14; i++){
+            BG_PALETTE_SUB[i + 1] = Constants::TILE_COLORS[i];
+        }
+    }
+
+Note: i + 1 because TILE_COLORS[0] goes to palette index 1
+(palette index 0 is reserved for empty/black)
+
+ADD TO RENDERER.CPP (after the tile creation code):
+
+    //set up palette
+    if(m_screen == Constants::MAIN_SCREEN){
+        BG_PALETTE[0] = RGB15(0, 0, 0);
+        for(int i = 0; i < 14; i++){
+            BG_PALETTE[i + 1] = Constants::TILE_COLORS[i];
+        }
+    } else {
+        BG_PALETTE_SUB[0] = RGB15(0, 0, 0);
+        for(int i = 0; i < 14; i++){
+            BG_PALETTE_SUB[i + 1] = Constants::TILE_COLORS[i];
+        }
+    }
+
+================================================================================
+STEP 3: CLEAR THE MAP
+================================================================================
+
+Your m_mapPtr points to the tile map (which tile goes where on screen).
+The map is 32x32 = 1024 entries. Each entry is a u16 (2 bytes).
+
+Setting an entry to 0 means "show tile 0" (your empty/black tile).
+
+WHAT TO DO:
+
+Use memset to fill the entire map with zeros:
+
+    memset(m_mapPtr, 0, 1024 * 2);
+
+That's 1024 entries times 2 bytes each = 2048 bytes total.
+
+ADD TO RENDERER.CPP (after the palette code):
+
+    //clear the map
+    memset(m_mapPtr, 0, 2048);
+
+================================================================================
+YOUR COMPLETE INITIALIZE() SHOULD NOW LOOK LIKE:
+================================================================================
+
+void Renderer::initialize(int SCREEN, int MODE){
+    if (SCREEN == Constants::MAIN_SCREEN){
+        videoSetMode(MODE | DISPLAY_BG0_ACTIVE);
+        vramSetBankA(VRAM_A_MAIN_BG);
+        m_bgId = bgInit(0, BgType_Text8bpp, BgSize_T_256x256, 0, 1);
+    } else {
+        videoSetModeSub(MODE | DISPLAY_BG0_ACTIVE);
+        vramSetBankC(VRAM_C_SUB_BG);
+        m_bgId = bgInitSub(0, BgType_Text8bpp, BgSize_T_256x256, 0, 1);
+    }
+
+    m_mapPtr = bgGetMapPtr(m_bgId);
+    m_tilePtr = bgGetGfxPtr(m_bgId);
+    m_screen = SCREEN;
+
+    //create tiles (15 tiles: 0=empty, 1-14=colors)
+    u8* tileMemory = (u8*)m_tilePtr;
+    for(int i = 0; i < 15; i++){
+        memset(&tileMemory[i * 64], i, 64);
+    }
+
+    //set up palette
+    if(m_screen == Constants::MAIN_SCREEN){
+        BG_PALETTE[0] = RGB15(0, 0, 0);
+        for(int i = 0; i < 14; i++){
+            BG_PALETTE[i + 1] = Constants::TILE_COLORS[i];
+        }
+    } else {
+        BG_PALETTE_SUB[0] = RGB15(0, 0, 0);
+        for(int i = 0; i < 14; i++){
+            BG_PALETTE_SUB[i + 1] = Constants::TILE_COLORS[i];
+        }
+    }
+
+    //clear the map
+    memset(m_mapPtr, 0, 2048);
+}
+
+================================================================================
+INCLUDE YOU MIGHT NEED
+================================================================================
+
+For memset, add at the top of renderer.cpp:
+
+    #include <string.h>
+
+Or it might already be included via nds.h.
+
+================================================================================
+WHAT THIS DOES VISUALLY
+================================================================================
+
+After this runs:
+    - Both screens will be completely black
+    - You have 15 tiles ready: tile 0 is black, tiles 1-14 are your colors
+    - The palette knows what colors to display
+
+To test it works, you could temporarily set one map tile to show a color:
+
+    m_mapPtr[0] = 1;  // top-left tile shows salmon color
+
+================================================================================
+NEXT STEP
+================================================================================
+
+Add these public methods to Renderer:
+
+In renderer.hpp, add under public:
+    void setTile(int x, int y, int tileIndex);
+    void clear();
+
+In renderer.cpp, add:
+
+    void Renderer::setTile(int x, int y, int tileIndex){
+        m_mapPtr[y * 32 + x] = tileIndex;
+    }
+
+    void Renderer::clear(){
+        memset(m_mapPtr, 0, 2048);
+    }
+
+Then you can do:
+    gameScreen.setTile(5, 10, 3);  // put yellow tile at x=5, y=10
+    gameScreen.clear();             // clear screen back to black
+
+================================================================================
