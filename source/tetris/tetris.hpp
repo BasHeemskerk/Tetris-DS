@@ -1,5 +1,14 @@
 #pragma once
 
+//general libraries
+#include <nds.h>
+
+//rendering code
+#include "../engine/rendering/renderer.hpp"
+
+//constants
+#include "../engine/constants.hpp"
+
 class Tetris{
     public:
         Tetris();
@@ -10,5 +19,6 @@ class Tetris{
         void gameLoop();
     
     private:
-
+        Renderer gameScreen;
+        Renderer uiScreen;
 };

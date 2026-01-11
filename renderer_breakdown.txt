@@ -1,0 +1,172 @@
+================================================================================
+                        RENDERER ARCHITECTURE BREAKDOWN
+                           NDS Tetris Clone Project
+================================================================================
+
+You have two main approaches. Read both, then decide.
+
+================================================================================
+SCENARIO A: NAMESPACE APPROACH
+================================================================================
+
+Structure:
+    Renderer::function()
+
+Example code:
+
+    // renderer.hpp
+    namespace Renderer {
+        void initialize();
+        void drawTile(int screen, int x, int y, u16 color);
+        void drawText(int screen, int x, int y, const char* text);
+        void drawRect(int screen, int x, int y, int w, int h, u16 color);
+        void drawBackground(int screen);
+        void flip();
+    }
+
+    // Usage in your game
+    Renderer::initialize();
+    Renderer::drawTile(SCREEN_BOTTOM, 5, 10, COLOR_RED);
+    Renderer::drawText(SCREEN_TOP, 0, 0, "Score: 999");
+    Renderer::drawBackground(SCREEN_TOP);
+    Renderer::flip();
+
+Internal state (hidden in renderer.cpp):
+
+    namespace Renderer {
+        static u16* vramTop;
+        static u16* vramBottom;
+        static int currentMode;
+        // etc...
+    }
+
+PROS:
+    - Simple, no object instantiation
+    - All rendering logic in one place
+    - Easy to call from anywhere: just Renderer::whatever()
+    - No need to pass renderer objects around
+    - Familiar if you've used C-style code
+
+CONS:
+    - Must pass screen parameter to EVERY draw call
+    - Easy to make mistakes (wrong screen constant)
+    - All state is global/static (hidden but still global)
+    - Harder to extend if you want different configurations per screen
+    - Verbose: Renderer::drawTile() every time
+
+--------------------------------------------------------------------------------
+
+================================================================================
+SCENARIO B: CLASS APPROACH
+================================================================================
+
+Structure:
+    renderer.function()
+
+Example code:
+
+    // renderer.hpp
+    class Renderer {
+    public:
+        void initialize(int screen);
+        void drawTile(int x, int y, u16 color);
+        void drawText(int x, int y, const char* text);
+        void drawRect(int x, int y, int w, int h, u16 color);
+        void drawBackground();
+        void flip();
+
+    private:
+        u16* m_vram;
+        int m_screen;
+        int m_width;
+        int m_height;
+    };
+
+    // Usage in your game
+    Renderer topScreen;
+    Renderer bottomScreen;
+
+    topScreen.initialize(SCREEN_TOP);
+    bottomScreen.initialize(SCREEN_BOTTOM);
+
+    bottomScreen.drawTile(5, 10, COLOR_RED);
+    topScreen.drawText(0, 0, "Score: 999");
+    topScreen.drawBackground();
+
+    topScreen.flip();
+    bottomScreen.flip();
+
+PROS:
+    - No need to pass screen to every call (it's stored in the object)
+    - Each instance has its own state
+    - Cleaner syntax: bottomScreen.drawTile() vs Renderer::drawTile(SCREEN_BOTTOM, ...)
+    - Can have different configurations per renderer
+    - State is explicitly owned by the object, not hidden globals
+    - Matches OOP style you're using for tetris_nds
+    - Extensible: could subclass for specialized renderers later
+
+CONS:
+    - Need to create and manage objects
+    - Need to pass renderer objects to functions that need them
+    - Slightly more setup code
+    - Two objects to keep track of
+
+--------------------------------------------------------------------------------
+
+================================================================================
+DIRECT COMPARISON
+================================================================================
+
+Drawing a tile on the bottom screen:
+
+    NAMESPACE:  Renderer::drawTile(SCREEN_BOTTOM, x, y, color);
+    CLASS:      bottomScreen.drawTile(x, y, color);
+
+Drawing text on the top screen:
+
+    NAMESPACE:  Renderer::drawText(SCREEN_TOP, x, y, "Hello");
+    CLASS:      topScreen.drawText(x, y, "Hello");
+
+In your tetris_nds class:
+
+    NAMESPACE:
+        class tetris_nds {
+            void render() {
+                Renderer::drawTile(SCREEN_BOTTOM, pieceX, pieceY, color);
+                Renderer::drawText(SCREEN_TOP, 0, 0, scoreText);
+            }
+        };
+
+    CLASS:
+        class tetris_nds {
+            Renderer m_gameScreen;
+            Renderer m_uiScreen;
+
+            void initialize() {
+                m_gameScreen.initialize(SCREEN_BOTTOM);
+                m_uiScreen.initialize(SCREEN_TOP);
+            }
+
+            void render() {
+                m_gameScreen.drawTile(pieceX, pieceY, color);
+                m_uiScreen.drawText(0, 0, scoreText);
+            }
+        };
+
+================================================================================
+SUMMARY
+================================================================================
+
+Choose NAMESPACE if:
+    - You want simplicity
+    - You don't mind passing screen constants everywhere
+    - You prefer a more C-style / procedural approach
+    - You want to call rendering functions from anywhere without passing objects
+
+Choose CLASS if:
+    - You want cleaner per-call syntax (no screen parameter every time)
+    - You want each screen to have its own encapsulated state
+    - You want consistency with your OOP tetris_nds design
+    - You're learning OOP and want to practice that pattern
+
+================================================================================
